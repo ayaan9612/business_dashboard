@@ -22,10 +22,31 @@ const StatCard = ({ title, value, icon: Icon, trend, colorClass }) => (
 );
 
 const Dashboard = () => {
-  const { projects, finances } = useStore();
+  const { projects } = useStore();
 
   const activeProjects = projects.filter(p => p.status !== 'Completed').length;
   const completedProjects = projects.filter(p => p.status === 'Completed').length;
+
+  const totalIncome = projects
+    .filter(p => p.status === 'Completed')
+    .reduce((sum, p) => sum + (Number(p.budget) || 0), 0);
+
+  const pendingPayments = projects
+    .filter(p => p.status !== 'Completed')
+    .reduce((sum, p) => sum + (Number(p.budget) || 0), 0);
+
+  const recentTransactions = projects
+    .map(p => ({
+      _id: p._id,
+      amount: Number(p.budget) || 0,
+      type: 'Income',
+      status: p.status === 'Completed' ? 'Paid' : 'Pending',
+      date: p.deadline,
+      projectTitle: p.title
+    }))
+    .filter(tx => tx.amount > 0)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -37,14 +58,14 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard 
           title="Total Earnings" 
-          value={`$${finances.totalIncome.toLocaleString()}`} 
+          value={`$${totalIncome.toLocaleString()}`} 
           icon={DollarSign} 
-          trend="+12.5% this month"
+          trend={totalIncome > 0 ? "+ Active" : ""}
           colorClass="bg-primary/10 text-primary"
         />
         <StatCard 
           title="Pending Payments" 
-          value={`$${finances.pendingPayments.toLocaleString()}`} 
+          value={`$${pendingPayments.toLocaleString()}`} 
           icon={Clock} 
           colorClass="bg-amber-500/10 text-amber-500"
         />
@@ -70,7 +91,7 @@ const Dashboard = () => {
             <button className="text-sm text-primary hover:underline font-medium">View All</button>
           </div>
           <div className="divide-y divide-border">
-            {projects.slice(0, 3).map((project) => (
+            {projects.length > 0 ? projects.slice(0, 3).map((project) => (
               <div key={project._id} className="p-6 hover:bg-muted/50 transition-colors flex items-center justify-between group">
                 <div className="flex gap-4 items-center">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center text-primary font-bold shadow-sm">
@@ -95,7 +116,11 @@ const Dashboard = () => {
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="text-center text-muted-foreground text-sm py-8">
+                No active projects yet. Add your first project!
+              </div>
+            )}
           </div>
         </div>
 
@@ -105,7 +130,7 @@ const Dashboard = () => {
             <h3 className="text-xl font-semibold text-foreground">Recent Transactions</h3>
           </div>
           <div className="p-6 space-y-6">
-            {finances.recentTransactions.map((tx) => (
+            {recentTransactions.length > 0 ? recentTransactions.map((tx) => (
               <div key={tx._id} className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-full ${tx.status === 'Paid' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
@@ -118,7 +143,11 @@ const Dashboard = () => {
                 </div>
                 <span className="font-bold text-foreground">${tx.amount.toLocaleString()}</span>
               </div>
-            ))}
+            )) : (
+              <div className="text-center text-muted-foreground text-sm py-4">
+                No recent transactions. Add a project with a budget to see them here!
+              </div>
+            )}
           </div>
         </div>
       </div>

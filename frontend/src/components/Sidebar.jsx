@@ -1,11 +1,25 @@
-import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, FolderKanban, DollarSign, Calendar, Settings, LogOut, Mail } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutDashboard, FolderKanban, DollarSign, Calendar, Settings, LogOut, Mail, X } from 'lucide-react';
 import useStore from '../store/useStore';
 import clsx from 'clsx';
+import { signOut } from 'firebase/auth';
+import { auth } from '../firebase';
 
-const Sidebar = () => {
+const Sidebar = ({ onClose }) => {
   const location = useLocation();
-  const { user } = useStore();
+  const navigate = useNavigate();
+  const { user, logout } = useStore();
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+    logout();
+    navigate('/login');
+  };
+
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -17,14 +31,22 @@ const Sidebar = () => {
 
   return (
     <div className="flex flex-col h-screen w-64 bg-card border-r border-border px-4 py-6 shadow-sm">
-      <div className="flex items-center gap-3 px-2 mb-10">
-        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl shadow-lg shadow-primary/30">
-          F
+      <div className="flex items-center justify-between px-2 mb-10">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-xl shadow-lg shadow-primary/30">
+            F
+          </div>
+          <span className="text-xl font-semibold text-foreground tracking-tight">FreelanceHub</span>
         </div>
-        <span className="text-xl font-semibold text-foreground tracking-tight">FreelanceHub</span>
+        <button 
+          onClick={onClose} 
+          className="lg:hidden p-1.5 text-muted-foreground hover:bg-muted rounded-xl"
+        >
+          <X size={20} />
+        </button>
       </div>
 
-      <nav className="flex-1 space-y-2">
+      <nav className="flex-1 space-y-2 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -32,6 +54,7 @@ const Sidebar = () => {
             <Link
               key={item.name}
               to={item.path}
+              onClick={onClose}
               className={clsx(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group",
                 isActive 
@@ -57,7 +80,7 @@ const Sidebar = () => {
           </div>
         </div>
         
-        <button className="flex w-full items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
+        <button onClick={handleLogout} className="flex w-full items-center gap-3 px-3 py-2 text-sm font-medium text-muted-foreground rounded-lg hover:bg-destructive/10 hover:text-destructive transition-colors">
           <LogOut size={18} />
           Sign Out
         </button>

@@ -72,9 +72,15 @@
  
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border transition-colors duration-700 ease-in-out;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background text-foreground font-sans antialiased transition-colors duration-700 ease-in-out;
+  }
+  button, a {
+    @apply transition-all duration-300 ease-out;
+  }
+  button:active {
+    @apply scale-[0.97] opacity-90;
   }
 }

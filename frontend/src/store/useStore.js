@@ -1,27 +1,49 @@
 import { create } from 'zustand';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 
-// Use mock data to demonstrate the UI until the backend is fully wired up
-const mockProjects = [
-  { _id: '1', title: 'E-commerce Redesign', clientName: 'Acme Corp', deadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), progress: 65, status: 'In Progress', priority: 'High', budget: 5000 },
-  { _id: '2', title: 'Mobile App MVP', clientName: 'Startup Inc', deadline: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000), progress: 30, status: 'Pending', priority: 'Medium', budget: 12000 },
-  { _id: '3', title: 'Landing Page Optimization', clientName: 'SaaS Co', deadline: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), progress: 100, status: 'Completed', priority: 'Low', budget: 1500 },
-];
-
-const mockFinances = {
-  totalIncome: 24500,
-  pendingPayments: 8500,
-  recentTransactions: [
-    { _id: 't1', amount: 2500, type: 'Income', status: 'Paid', date: new Date(), projectTitle: 'Website Fixes' },
-    { _id: 't2', amount: 5000, type: 'Income', status: 'Pending', date: new Date(), projectTitle: 'E-commerce Redesign' },
-  ]
-};
-
-const useStore = create((set) => ({
-  user: { name: 'Admin', role: 'Admin', email: 'admin@example.com' },
+const useStore = create((set, get) => ({
+  user: JSON.parse(localStorage.getItem('user')) || null,
+  token: localStorage.getItem('token') || null,
   darkMode: true,
+  setUser: (userData) => {
+    localStorage.setItem('user', JSON.stringify(userData));
+    localStorage.setItem('token', userData.token);
+    set({ user: userData, token: userData.token });
+  },
+  logout: () => {
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    set({ user: null, token: null });
+  },
   toggleDarkMode: () => set((state) => ({ darkMode: !state.darkMode })),
-  projects: mockProjects,
-  finances: mockFinances,
+  projects: [],
+  isProjectsLoading: true,
+  fetchProjects: async () => {
+    const user = get().user;
+    if (!user?._id) {
+      set({ isProjectsLoading: false });
+      return;
+    }
+    set({ isProjectsLoading: true });
+    try {
+      const q = query(collection(db, 'projects'), where('userId', '==', user._id));
+      const querySnapshot = await getDocs(q);
+      const fetchedProjects = [];
+      querySnapshot.forEach((doc) => {
+        fetchedProjects.push({ _id: doc.id, ...doc.data() });
+      });
+      set({ projects: fetchedProjects.sort((a, b) => b.createdAt - a.createdAt), isProjectsLoading: false });
+    } catch (error) {
+      console.error("Error fetching projects:", error);
+      set({ isProjectsLoading: false });
+    }
+  },
+  finances: {
+    totalIncome: 0,
+    pendingPayments: 0,
+    recentTransactions: []
+  },
   setProjects: (projects) => set({ projects }),
   updateProject: (id, updatedData) => set((state) => ({
     projects: state.projects.map((p) => (p._id === id ? { ...p, ...updatedData } : p))

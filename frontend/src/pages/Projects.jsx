@@ -3,6 +3,8 @@ import useStore from '../store/useStore';
 import { Plus, Search, Filter, Clock, MoreVertical, Edit2, Trash2, CheckCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import NewProjectModal from '../components/NewProjectModal';
+import { collection, query, where, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 const ProjectCard = ({ project, onEdit }) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -21,16 +23,26 @@ const ProjectCard = ({ project, onEdit }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     updateProject(project._id, { status: 'Completed', progress: 100 });
     setIsDropdownOpen(false);
+    try {
+      await updateDoc(doc(db, 'projects', project._id), { status: 'Completed', progress: 100 });
+    } catch (error) {
+      console.error("Error updating project in DB", error);
+    }
   };
 
-  const handleDelete = (e) => {
+  const handleDelete = async (e) => {
     e.stopPropagation();
     if (confirmDelete) {
       deleteProject(project._id);
       setIsDropdownOpen(false);
+      try {
+        await deleteDoc(doc(db, 'projects', project._id));
+      } catch (error) {
+        console.error("Error deleting project in DB", error);
+      }
     } else {
       setConfirmDelete(true);
     }
@@ -117,26 +129,40 @@ const ProjectCard = ({ project, onEdit }) => {
 };
 
 const Projects = () => {
-  const { projects, setProjects, updateProject } = useStore();
+  const { user, projects, setProjects, updateProject, isProjectsLoading } = useStore();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [projectToEdit, setProjectToEdit] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleCreateOrUpdateProject = (data) => {
+  const handleCreateOrUpdateProject = async (data) => {
     if (projectToEdit) {
-      updateProject(projectToEdit._id, {
+      const updatedData = {
         ...data,
         budget: Number(data.budget) || 0,
-      });
+      };
+      updateProject(projectToEdit._id, updatedData);
+      try {
+        await updateDoc(doc(db, 'projects', projectToEdit._id), updatedData);
+      } catch (error) {
+        console.error("Error updating project", error);
+      }
     } else {
-      const newProject = {
-        _id: Date.now().toString(),
+      const newProjectData = {
         ...data,
         progress: 0,
         status: 'Pending',
         budget: Number(data.budget) || 0,
+        userId: user._id,
+        createdAt: Date.now()
       };
-      setProjects([newProject, ...projects]);
+      
+      try {
+        const docRef = await addDoc(collection(db, 'projects'), newProjectData);
+        const newProject = { _id: docRef.id, ...newProjectData };
+        setProjects([newProject, ...projects]);
+      } catch (error) {
+        console.error("Error adding project", error);
+      }
     }
     setIsModalOpen(false);
     setProjectToEdit(null);
@@ -191,7 +217,11 @@ const Projects = () => {
         </button>
       </div>
 
-      {filteredProjects.length === 0 ? (
+      {isProjectsLoading ? (
+        <div className="flex justify-center items-center p-12 flex-1">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      ) : filteredProjects.length === 0 ? (
         <div className="flex flex-col items-center justify-center p-12 text-center bg-card rounded-2xl border border-dashed border-border flex-1">
           <Search size={48} className="text-muted-foreground/30 mb-4" />
           <h3 className="text-xl font-semibold text-foreground mb-2">No projects found</h3>
